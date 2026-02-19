@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bus Crowding Prediction</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+
+        .container {
+            max-width: 600px;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .prediction-box {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .low {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .medium {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+
+        .high {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2 class="text-center mb-4">Bus Crowding Predictor</h2>
+        <form action="/" method="post">
+            <div class="mb-3">
+                <label for="route" class="form-label">Route Number</label>
+                <select class="form-select" id="route" name="route" required>
+                    <option value="" disabled {% if not selected_route %}selected{% endif %}>Select Route</option>
+                    {% for route in routes %}
+                    <option value="{{ route }}" {% if route==selected_route %}selected{% endif %}>{{ route }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="stop" class="form-label">Current Stop</label>
+                <select class="form-select" id="stop" name="stop" required>
+                    <option value="" disabled {% if not selected_stop %}selected{% endif %}>Select Stop</option>
+                    {% for stop in stops %}
+                    <option value="{{ stop }}" {% if stop==selected_stop %}selected{% endif %}>{{ stop }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="hour" class="form-label">Hour of Day (0-23)</label>
+                <input type="number" class="form-control" id="hour" name="hour" min="0" max="23"
+                    value="{{ selected_hour }}" required>
+            </div>
+            <div class="mb-3">
+                <label for="day" class="form-label">Day of Week</label>
+                <select class="form-select" id="day" name="day" required>
+                    {% for day in days %}
+                    <option value="{{ day }}" {% if day==selected_day %}selected{% endif %}>{{ day }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="weather" class="form-label">Weather</label>
+                <select class="form-select" id="weather" name="weather" required>
+                    <option value="" disabled {% if not selected_weather %}selected{% endif %}>Select Weather</option>
+                    {% for weather in weathers %}
+                    <option value="{{ weather }}" {% if weather==selected_weather %}selected{% endif %}>{{ weather }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <!-- Additional features for model input -->
+            <input type="hidden" name="buses_available" value="5">
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-grow-1">Predict Crowding</button>
+                <a href="/" class="btn btn-secondary">Reset</a>
+            </div>
+        </form>
+
+        {% if prediction %}
+        <div class="prediction-box {{ prediction_class }}">
+            <h4>Prediction: {{ prediction }}</h4>
+            <p class="mb-0" style="font-size: 0.9em; font-weight: normal;">
+                Inputs: Route <strong>{{ selected_route }}</strong> at <strong>{{ selected_stop }}</strong>,
+                <strong>{{ selected_hour }}:00</strong> on <strong>{{ selected_day }}</strong>
+                ({{ selected_weather }})
+            </p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+
+</html>
