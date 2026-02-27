@@ -46,46 +46,74 @@
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
+
+        #stop-warning {
+            display: none;
+            font-size: 0.85em;
+            color: #856404;
+            margin-top: 4px;
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <h2 class="text-center mb-4">Bus Crowding Predictor</h2>
+        <h2 class="text-center mb-4">🚌 Bus Crowding Predictor</h2>
+
+        {% if error_message %}
+        <div class="alert alert-danger d-flex align-items-center" role="alert">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
+                class="bi bi-exclamation-triangle-fill me-2" viewBox="0 0 16 16">
+                <path
+                    d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" />
+            </svg>
+            <div>{{ error_message }}</div>
+        </div>
+        {% endif %}
+
         <form action="/" method="post">
+            <!-- Route -->
             <div class="mb-3">
-                <label for="route" class="form-label">Route Number</label>
-                <select class="form-select" id="route" name="route" required>
+                <label for="route" class="form-label fw-semibold">Route Number</label>
+                <select class="form-select" id="route" name="route" required onchange="updateStops(this.value)">
                     <option value="" disabled {% if not selected_route %}selected{% endif %}>Select Route</option>
                     {% for route in routes %}
                     <option value="{{ route }}" {% if route==selected_route %}selected{% endif %}>{{ route }}</option>
                     {% endfor %}
                 </select>
             </div>
+
+            <!-- Stop (dynamically filtered) -->
             <div class="mb-3">
-                <label for="stop" class="form-label">Current Stop</label>
+                <label for="stop" class="form-label fw-semibold">Current Stop</label>
                 <select class="form-select" id="stop" name="stop" required>
-                    <option value="" disabled {% if not selected_stop %}selected{% endif %}>Select Stop</option>
-                    {% for stop in stops %}
-                    <option value="{{ stop }}" {% if stop==selected_stop %}selected{% endif %}>{{ stop }}</option>
-                    {% endfor %}
+                    <option value="" disabled selected>Select Route first</option>
                 </select>
+                <small id="stop-warning" class="text-warning">
+                    ⚠️ Please select a route first to see valid stops.
+                </small>
             </div>
+
+            <!-- Hour -->
             <div class="mb-3">
-                <label for="hour" class="form-label">Hour of Day (0-23)</label>
+                <label for="hour" class="form-label fw-semibold">Hour of Day (0–23)</label>
                 <input type="number" class="form-control" id="hour" name="hour" min="0" max="23"
                     value="{{ selected_hour }}" required>
             </div>
+
+            <!-- Day -->
             <div class="mb-3">
-                <label for="day" class="form-label">Day of Week</label>
+                <label for="day" class="form-label fw-semibold">Day of Week</label>
                 <select class="form-select" id="day" name="day" required>
                     {% for day in days %}
                     <option value="{{ day }}" {% if day==selected_day %}selected{% endif %}>{{ day }}</option>
                     {% endfor %}
                 </select>
             </div>
+
+            <!-- Weather -->
             <div class="mb-3">
-                <label for="weather" class="form-label">Weather</label>
+                <label for="weather" class="form-label fw-semibold">Weather</label>
                 <select class="form-select" id="weather" name="weather" required>
                     <option value="" disabled {% if not selected_weather %}selected{% endif %}>Select Weather</option>
                     {% for weather in weathers %}
@@ -94,7 +122,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <!-- Additional features for model input -->
+
             <input type="hidden" name="buses_available" value="5">
 
             <div class="d-flex gap-2">
@@ -105,15 +133,81 @@
 
         {% if prediction %}
         <div class="prediction-box {{ prediction_class }}">
-            <h4>Prediction: {{ prediction }}</h4>
+            <h4>
+                {% if prediction == 'High' %}🔴{% elif prediction == 'Medium' %}🟡{% else %}🟢{% endif %}
+                Crowding: {{ prediction }}
+            </h4>
             <p class="mb-0" style="font-size: 0.9em; font-weight: normal;">
-                Inputs: Route <strong>{{ selected_route }}</strong> at <strong>{{ selected_stop }}</strong>,
+                Route <strong>{{ selected_route }}</strong> at <strong>{{ selected_stop }}</strong>,
                 <strong>{{ selected_hour }}:00</strong> on <strong>{{ selected_day }}</strong>
                 ({{ selected_weather }})
             </p>
         </div>
         {% endif %}
     </div>
+
+    <!-- Route → Stops mapping passed from Flask -->
+    <script type="application/json" id="route-stops-data">
+        {{ route_stops | default({}) | tojson | safe }}
+    </script>
+    <script type="application/json" id="selected-stop-data">
+        {{ selected_stop | default('') | tojson | safe }}
+    </script>
+
+    <script>
+        const routeStops = JSON.parse(document.getElementById('route-stops-data').textContent || '{}');
+
+        function updateStops(selectedRoute) {
+            const stopSelect = document.getElementById('stop');
+            const warning = document.getElementById('stop-warning');
+
+            stopSelect.innerHTML = '';
+
+            if (!routeStops || !selectedRoute || !routeStops[selectedRoute]) {
+                stopSelect.innerHTML = '<option value="" disabled selected>Select Route first</option>';
+                warning.style.display = 'block';
+                return;
+            }
+
+            warning.style.display = 'none';
+
+            const stops = routeStops[selectedRoute];
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.disabled = true;
+            placeholder.selected = true;
+            placeholder.textContent = `Select stop on Route ${selectedRoute}`;
+            stopSelect.appendChild(placeholder);
+
+            stops.forEach(stop => {
+                const opt = document.createElement('option');
+                opt.value = stop;
+                opt.textContent = stop;
+                stopSelect.appendChild(opt);
+            });
+        }
+
+        // On page load, if a route was already selected (after form submit), repopulate stops
+        window.addEventListener('DOMContentLoaded', () => {
+            const routeSelect = document.getElementById('route');
+            const selectedStop = JSON.parse(document.getElementById('selected-stop-data').textContent || '""');
+            const selectedRoute = routeSelect.value;
+
+            if (selectedRoute) {
+                updateStops(selectedRoute);
+                // Re-select the previously chosen stop
+                if (selectedStop) {
+                    const stopSelect = document.getElementById('stop');
+                    for (let opt of stopSelect.options) {
+                        if (opt.value === selectedStop) {
+                            opt.selected = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+    </script>
 </body>
 
 </html>
