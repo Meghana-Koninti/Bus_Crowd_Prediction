@@ -6,117 +6,189 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# Load Model and Encoders
-model_path = 'models/hyderabad_bus_model.pkl'
-encoders_path = 'models/hyderabad_encoders.pkl'
-
-with open(model_path, 'rb') as f:
+with open('models/hyderabad_bus_model.pkl', 'rb') as f:
     model = pickle.load(f)
-
-with open(encoders_path, 'rb') as f:
+with open('models/hyderabad_encoders.pkl', 'rb') as f:
     encoders = pickle.load(f)
 
-# ─────────────────────────────────────────────
-# Real-world Route → Stop mapping for Hyderabad
-# This prevents impossible route+stop combinations
-# ─────────────────────────────────────────────
-ROUTE_STOPS = {
-    "9X":  ["Secunderabad Station", "SR Nagar", "Ameerpet", "Hitech City", "Madhapur", "Gachibowli"],
-    "10H": ["LB Nagar", "Uppal", "Secunderabad Station", "Ameerpet", "Banjara Hills", "Jubilee Hills Checkpost", "Madhapur"],
-    "47L": ["Charminar", "Koti", "Mehdipatnam", "Ameerpet", "SR Nagar", "Banjara Hills"],
-    "5K":  ["Secunderabad Station", "Koti", "Charminar", "LB Nagar", "Uppal"],
-    "127K":["Gachibowli", "Hitech City", "Madhapur", "Banjara Hills", "Ameerpet", "SR Nagar", "Secunderabad Station"],
-    "218": ["Mehdipatnam", "Banjara Hills", "Jubilee Hills Checkpost", "Gachibowli", "Hitech City"],
+STOP_COORDS = {
+    'Hitech City': [17.4483, 78.3915],
+    'Madhapur': [17.4411, 78.3911],
+    'Ameerpet': [17.4375, 78.4482],
+    'Jubilee Hills Checkpost': [17.4251, 78.4140],
+    'Secunderabad Station': [17.4399, 78.4983],
+    'Mehdipatnam': [17.3958, 78.4312],
+    'Kukatpally': [17.4875, 78.3953],
+    'Koti': [17.3850, 78.4867],
+    'Charminar': [17.3616, 78.4747],
+    'LB Nagar': [17.3469, 78.5469],
+    'Uppal': [17.4016, 78.5597],
+    'Gachibowli': [17.4400, 78.3489],
+    'SR Nagar': [17.4509, 78.4413],
+    'Banjara Hills': [17.4156, 78.4347],
+    'MGBS': [17.3784, 78.4822],
+    'Dilsukhnagar': [17.3688, 78.5268],
+    'Miyapur': [17.4957, 78.3544],
+    'ECIL': [17.4650, 78.5528]
 }
 
-@app.route('/get_stops/<route>', methods=['GET'])
-def get_stops(route):
-    """API endpoint: returns valid stops for a given route."""
-    stops = ROUTE_STOPS.get(route, [])
-    return jsonify({"stops": stops})
+# Route → stops mapping for alternate stop suggestions
+ROUTE_STOPS = {
+    '9X':  ['Miyapur', 'Kukatpally', 'SR Nagar', 'Ameerpet', 'Mehdipatnam'],
+    '47L': ['Secunderabad Station', 'Ameerpet', 'Jubilee Hills Checkpost', 'Banjara Hills', 'Gachibowli'],
+    '127K':['MGBS', 'Koti', 'Mehdipatnam', 'SR Nagar', 'Hitech City'],
+    '218': ['ECIL', 'Uppal', 'LB Nagar', 'Dilsukhnagar', 'MGBS'],
+    '10H': ['Secunderabad Station', 'ECIL', 'Uppal', 'LB Nagar'],
+    '5K':  ['Madhapur', 'Hitech City', 'Gachibowli', 'Miyapur'],
+    '216': ['Charminar', 'Koti', 'MGBS', 'Mehdipatnam', 'Ameerpet'],
+    '400': ['Dilsukhnagar', 'LB Nagar', 'Uppal', 'ECIL', 'Secunderabad Station'],
+}
 
-@app.route('/', methods=['GET', 'POST'])
+# Hyderabad event calendar: (month, day) -> event info
+HYDERABAD_EVENTS = {
+    (1,14): {'name':'Sankranti', 'affected_stops':['Charminar','Koti','MGBS','Mehdipatnam'], 'boost':'High'},
+    (1,15): {'name':'Sankranti', 'affected_stops':['Charminar','Koti','MGBS','Mehdipatnam'], 'boost':'High'},
+    (1,16): {'name':'Sankranti', 'affected_stops':['Charminar','Koti','MGBS'], 'boost':'Medium'},
+    (3,17): {'name':'Holi',      'affected_stops':['Charminar','Koti','MGBS','Ameerpet'], 'boost':'High'},
+    (3,18): {'name':'Holi',      'affected_stops':['Charminar','Koti','MGBS'], 'boost':'Medium'},
+    (7,15): {'name':'Bonalu',    'affected_stops':['Charminar','Koti','MGBS','Mehdipatnam','LB Nagar'], 'boost':'High'},
+    (7,16): {'name':'Bonalu',    'affected_stops':['Charminar','Koti','MGBS','Mehdipatnam'], 'boost':'High'},
+    (7,22): {'name':'Bonalu',    'affected_stops':['Secunderabad Station','ECIL','Uppal'], 'boost':'High'},
+    (7,23): {'name':'Bonalu',    'affected_stops':['Secunderabad Station','ECIL'], 'boost':'High'},
+    (7,29): {'name':'Bonalu',    'affected_stops':['Charminar','Koti','MGBS'], 'boost':'High'},
+    (7,30): {'name':'Bonalu',    'affected_stops':['Charminar','Koti','MGBS'], 'boost':'High'},
+    (8,5):  {'name':'Bonalu',    'affected_stops':['Mehdipatnam','SR Nagar','Ameerpet'], 'boost':'High'},
+    (8,15): {'name':'Independence Day', 'affected_stops':['Secunderabad Station','MGBS','Charminar'], 'boost':'High'},
+    (9,7):  {'name':'Ganesh Chaturthi','affected_stops':['Charminar','Koti','MGBS','Ameerpet','Banjara Hills'], 'boost':'High'},
+    (9,17): {'name':'Ganesh Immersion','affected_stops':['Charminar','MGBS','Koti','Mehdipatnam','LB Nagar'], 'boost':'High'},
+    (10,2): {'name':'Gandhi Jayanti',  'affected_stops':['Secunderabad Station','MGBS'], 'boost':'Medium'},
+    (10,12):{'name':'Dussehra',  'affected_stops':['Charminar','Koti','MGBS','Ameerpet','Secunderabad Station'], 'boost':'High'},
+    (10,13):{'name':'Dussehra', 'affected_stops':['Charminar','Koti','MGBS'], 'boost':'Medium'},
+    (11,1): {'name':'Diwali',    'affected_stops':['Charminar','Koti','MGBS','Ameerpet','Jubilee Hills Checkpost'], 'boost':'High'},
+    (11,2): {'name':'Diwali',    'affected_stops':['Charminar','MGBS','Koti'], 'boost':'Medium'},
+    (12,25):{'name':'Christmas', 'affected_stops':['Banjara Hills','Jubilee Hills Checkpost','Hitech City','Madhapur'], 'boost':'Medium'},
+}
+
+# IPL: April-May, Uppal area
+IPL_STOPS = ['Uppal', 'ECIL', 'Secunderabad Station']
+IPL_PEAK_HOURS = list(range(16, 23))
+
+def get_event_alert(month, day, stop, hour):
+    key = (month, day)
+    if key in HYDERABAD_EVENTS:
+        ev = HYDERABAD_EVENTS[key]
+        if stop in ev['affected_stops']:
+            return ev['name'], ev['boost']
+    if month in [4, 5] and stop in IPL_STOPS and hour in IPL_PEAK_HOURS:
+        return 'IPL Match', 'High'
+    return None, None
+
+def encode_and_predict(route, stop, hour, day, weather, buses, month=None, is_festival=0):
+    if month is None:
+        month = datetime.now().month
+    route_enc = encoders['Route_No'].transform([route])[0]
+    stop_enc  = encoders['Current_Stop'].transform([stop])[0]
+    weather_enc = encoders['Weather'].transform([weather])[0]
+    day_enc   = encoders['Day_of_Week'].transform([day])[0]
+    is_weekend = 1 if day in ['Saturday', 'Sunday'] else 0
+    features = np.array([[hour, day_enc, is_weekend, route_enc, stop_enc, weather_enc, buses, month, is_festival]])
+    proba = model.predict_proba(features)[0]
+    pred_enc = model.predict(features)[0]
+    pred_label = encoders['Crowding_Level'].inverse_transform([pred_enc])[0]
+    classes = encoders['Crowding_Level'].classes_
+    proba_dict = {c: float(round(p*100)) for c, p in zip(classes, proba)}
+    confidence = float(round(max(proba)*100))
+    return pred_label, confidence, proba_dict
+
+routes = encoders['Route_No'].classes_
+stops  = encoders['Current_Stop'].classes_
+weathers = encoders['Weather'].classes_
+days   = encoders['Day_of_Week'].classes_
+
+@app.route('/')
 def home():
-    prediction = None
-    prediction_class = ""
-    error_message = None
-
-    routes = list(ROUTE_STOPS.keys())
-    weathers = encoders['Weather'].classes_
-    days = encoders['Day_of_Week'].classes_
-
-    selected_route = ""
-    selected_stop = ""
-    selected_hour = datetime.now().hour
-    selected_day = datetime.now().strftime('%A')
-    selected_weather = ""
-    available_stops = []
-
-    if request.method == 'POST':
-        try:
-            route = request.form.get('route')
-            stop = request.form.get('stop')
-
-            selected_route = route
-            selected_stop = stop
-            available_stops = ROUTE_STOPS.get(route, [])
-
-            # ── VALIDATION: Check if stop belongs to selected route ──
-            if route not in ROUTE_STOPS:
-                error_message = f"Route '{route}' is not a recognized route."
-            elif stop not in ROUTE_STOPS[route]:
-                valid_stops = ", ".join(ROUTE_STOPS[route])
-                error_message = (
-                    f"Stop '{stop}' is not on Route {route}. "
-                    f"Valid stops for {route} are: {valid_stops}."
-                )
-            else:
-                hour_input = request.form.get('hour')
-                hour = int(hour_input) if hour_input else datetime.now().hour
-                selected_hour = hour
-
-                day = request.form.get('day') or datetime.now().strftime('%A')
-                selected_day = day
-
-                weather = request.form.get('weather')
-                selected_weather = weather
-
-                buses_available = int(request.form.get('buses_available', 5))
-                is_weekend = 1 if day in ['Saturday', 'Sunday'] else 0
-
-                route_encoded   = encoders['Route_No'].transform([route])[0]
-                stop_encoded    = encoders['Current_Stop'].transform([stop])[0]
-                day_encoded     = encoders['Day_of_Week'].transform([day])[0]
-                weather_encoded = encoders['Weather'].transform([weather])[0]
-
-                features = np.array([[hour, day_encoded, is_weekend,
-                                      route_encoded, stop_encoded,
-                                      weather_encoded, buses_available]])
-
-                pred_encoded = model.predict(features)[0]
-                prediction = encoders['Crowding_Level'].inverse_transform([pred_encoded])[0]
-                prediction_class = prediction.lower()
-
-                print(f"Prediction: {route} @ {stop}, {hour}:00, {day} -> {prediction}")
-
-        except Exception as e:
-            print(f"Error: {e}")
-            error_message = f"Something went wrong: {str(e)}"
-
+    now = datetime.now()
     return render_template('index.html',
-                           routes=routes,
-                           weathers=weathers,
-                           days=days,
-                           prediction=prediction,
-                           prediction_class=prediction_class,
-                           error_message=error_message,
-                           selected_route=selected_route,
-                           selected_stop=selected_stop,
-                           selected_hour=selected_hour,
-                           selected_day=selected_day,
-                           selected_weather=selected_weather,
-                           available_stops=available_stops,
-                           route_stops=ROUTE_STOPS)
+        routes=list(routes), stops=list(stops),
+        weathers=list(weathers), days=list(days),
+        stop_coords=STOP_COORDS,
+        current_hour=now.hour,
+        current_day=now.strftime('%A'),
+        current_month=now.month
+    )
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    data = request.json
+    route   = data['route']
+    stop    = data['stop']
+    hour    = int(data['hour'])
+    day     = data['day']
+    weather = data['weather']
+    buses   = int(data['buses'])
+    month   = int(data.get('month', datetime.now().month))
+
+    # Check for event override
+    event_name, event_boost = get_event_alert(month, datetime.now().day, stop, hour)
+    is_festival = 1 if event_name else 0
+
+    pred, confidence, proba = encode_and_predict(route, stop, hour, day, weather, buses, month, is_festival)
+
+    # Event override: boost to High if event says so
+    event_alert = None
+    if event_boost == 'High' and pred != 'High':
+        pred = 'High'
+        confidence = max(confidence, 75)
+        event_alert = f"⚠️ {event_name} detected near this stop — crowd boosted to High"
+    elif event_boost == 'Medium' and pred == 'Low':
+        pred = 'Medium'
+        confidence = max(confidence, 70)
+        event_alert = f"🎉 {event_name} nearby — expect moderate crowd increase"
+
+    # 6-hour forecast
+    forecast = []
+    for h_offset in range(0, 7):
+        fh = (hour + h_offset) % 24
+        fp, fc, _ = encode_and_predict(route, stop, fh, day, weather, buses, month, is_festival)
+        # Check event for each future hour
+        fe_name, fe_boost = get_event_alert(month, datetime.now().day, stop, fh)
+        if fe_boost == 'High' and fp != 'High':
+            fp = 'High'
+        elif fe_boost == 'Medium' and fp == 'Low':
+            fp = 'Medium'
+        label = 'Now' if h_offset == 0 else f'+{h_offset}h'
+        forecast.append({'label': label, 'hour': fh, 'level': fp, 'confidence': fc})
+
+    # Alternate stops (only if High)
+    alternates = []
+    if pred == 'High' and route in ROUTE_STOPS:
+        route_stop_list = ROUTE_STOPS[route]
+        for alt_stop in route_stop_list:
+            if alt_stop != stop and alt_stop in list(stops):
+                try:
+                    ap, ac, _ = encode_and_predict(route, alt_stop, hour, day, weather, buses, month, is_festival)
+                    if ap in ['Low', 'Medium']:
+                        dist_info = ''
+                        if alt_stop in STOP_COORDS and stop in STOP_COORDS:
+                            s1 = STOP_COORDS[stop]
+                            s2 = STOP_COORDS[alt_stop]
+                            dist_km = round(((s1[0]-s2[0])**2 + (s1[1]-s2[1])**2)**0.5 * 111, 1)
+                            dist_info = f'{dist_km} km away'
+                        alternates.append({'stop': alt_stop, 'level': ap, 'dist': dist_info})
+                    if len(alternates) >= 2:
+                        break
+                except:
+                    pass
+
+    return jsonify({
+        'prediction': pred,
+        'confidence': confidence,
+        'proba': proba,
+        'forecast': forecast,
+        'alternates': alternates,
+        'event_alert': event_alert,
+        'stop_coords': STOP_COORDS.get(stop, [17.385, 78.4867])
+    })
 
 if __name__ == '__main__':
     app.run(debug=True)

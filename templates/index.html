@@ -1,213 +1,677 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bus Crowding Prediction</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body {
-            padding: 20px;
-            background-color: #f8f9fa;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Transit · Hyderabad</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    :root {
+      --navy:   #1a2744;
+      --navy2:  #243457;
+      --accent: #f97316;
+      --green:  #16a34a;
+      --yellow: #d97706;
+      --red:    #dc2626;
+      --sidebar-w: 220px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #f1f5f9; font-family: 'Segoe UI', sans-serif; display: flex; min-height: 100vh; }
 
-        .container {
-            max-width: 600px;
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
+    /* SIDEBAR */
+    #sidebar {
+      width: var(--sidebar-w); background: var(--navy);
+      display: flex; flex-direction: column;
+      position: fixed; top: 0; left: 0; height: 100vh; z-index: 100;
+    }
+    .sidebar-brand { padding: 22px 18px 18px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .sidebar-brand h1 { font-size: 15px; font-weight: 700; color: #fff; }
+    .sidebar-brand p  { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+    .brand-icon {
+      width: 36px; height: 36px; background: var(--accent);
+      border-radius: 10px; display: flex; align-items: center; justify-content: center;
+      margin-bottom: 10px;
+    }
+    .brand-icon i { color: #fff; font-size: 17px; }
+    .nav-section {
+      padding: 14px 12px 4px; font-size: 10px; font-weight: 600;
+      letter-spacing: 0.08em; color: rgba(255,255,255,0.3); text-transform: uppercase;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; margin: 2px 8px; border-radius: 8px;
+      cursor: pointer; color: rgba(255,255,255,0.6);
+      font-size: 13.5px; font-weight: 500; transition: all 0.18s;
+      text-decoration: none;
+    }
+    .nav-item i { width: 18px; text-align: center; font-size: 14px; }
+    .nav-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
+    .nav-item.active { background: rgba(249,115,22,0.18); color: #fb923c; }
+    .nav-item.active i { color: var(--accent); }
+    .sidebar-footer { margin-top: auto; padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.07); font-size: 11px; color: rgba(255,255,255,0.25); }
 
-        .prediction-box {
-            margin-top: 20px;
-            padding: 20px;
-            border-radius: 5px;
-            text-align: center;
-            font-weight: bold;
-            font-size: 1.2em;
-        }
+    /* MAIN */
+    #main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+    .top-bar {
+      background: #fff; border-bottom: 1px solid #e2e8f0;
+      padding: 14px 28px; display: flex; align-items: center;
+      justify-content: space-between; position: sticky; top: 0; z-index: 50;
+    }
+    .top-bar h2 { font-size: 17px; font-weight: 600; color: #1e293b; }
+    .top-bar p  { font-size: 12px; color: #94a3b8; margin: 0; }
+    .live-badge {
+      display: flex; align-items: center; gap: 6px;
+      background: #f0fdf4; border: 1px solid #bbf7d0;
+      color: var(--green); font-size: 12px; font-weight: 600;
+      padding: 5px 12px; border-radius: 20px;
+    }
+    .live-badge span { width: 7px; height: 7px; background: var(--green); border-radius: 50%; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .content-area { padding: 24px 28px; flex: 1; }
+    .panel { display: none; }
+    .panel.active { display: block; }
 
-        .low {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
+    /* CARDS */
+    .card-box { background: #fff; border-radius: 14px; border: 1px solid #e2e8f0; padding: 22px; }
+    .card-box + .card-box { margin-top: 16px; }
+    .card-title { font-size: 13px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px; }
 
-        .medium {
-            background-color: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeeba;
-        }
+    /* FORM */
+    .form-label { font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 5px; display: block; }
+    .form-control, .form-select {
+      border: 1px solid #e2e8f0; border-radius: 8px;
+      font-size: 14px; padding: 9px 12px; color: #1e293b;
+      transition: border-color 0.18s, box-shadow 0.18s; width: 100%;
+    }
+    .form-control:focus, .form-select:focus {
+      border-color: var(--accent); box-shadow: 0 0 0 3px rgba(249,115,22,0.12); outline: none;
+    }
+    .btn-now {
+      background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px;
+      font-size: 12px; font-weight: 600; color: #475569;
+      padding: 4px 10px; cursor: pointer;
+    }
+    .btn-now:hover { background: #e2e8f0; }
+    .btn-predict {
+      background: var(--navy); color: #fff; font-weight: 600; font-size: 14px;
+      border: none; border-radius: 10px; padding: 13px 24px;
+      width: 100%; cursor: pointer; transition: background 0.18s, transform 0.1s;
+    }
+    .btn-predict:hover  { background: var(--navy2); }
+    .btn-predict:active { transform: scale(0.98); }
 
-        .high {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
+    /* RESULT */
+    .result-banner {
+      border-radius: 12px; padding: 18px 20px; margin-bottom: 16px;
+      border: 1.5px solid; display: flex; align-items: center; gap: 14px;
+    }
+    .result-banner.high   { background: #fef2f2; border-color: #fca5a5; }
+    .result-banner.medium { background: #fffbeb; border-color: #fcd34d; }
+    .result-banner.low    { background: #f0fdf4; border-color: #86efac; }
+    .result-icon { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+    .high   .result-icon { background: #fee2e2; }
+    .medium .result-icon { background: #fef3c7; }
+    .low    .result-icon { background: #dcfce7; }
+    .result-text h3 { font-size: 18px; font-weight: 700; margin-bottom: 3px; }
+    .high   .result-text h3 { color: var(--red); }
+    .medium .result-text h3 { color: var(--yellow); }
+    .low    .result-text h3 { color: var(--green); }
+    .result-text p { font-size: 13px; color: #64748b; margin: 0; }
 
-        #stop-warning {
-            display: none;
-            font-size: 0.85em;
-            color: #856404;
-            margin-top: 4px;
-        }
-    </style>
+    /* CONFIDENCE */
+    .conf-label { font-size: 12px; color: #64748b; margin-bottom: 5px; display: flex; justify-content: space-between; }
+    .conf-bar { height: 7px; background: #e2e8f0; border-radius: 10px; overflow: hidden; }
+    .conf-fill { height: 100%; border-radius: 10px; transition: width 0.6s cubic-bezier(.4,0,.2,1); }
+    .conf-fill.high { background: var(--red); }
+    .conf-fill.medium { background: var(--yellow); }
+    .conf-fill.low { background: var(--green); }
+    .proba-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+    .proba-label { width: 60px; font-weight: 600; color: #475569; }
+    .proba-bar-bg { flex:1; background:#f1f5f9; height:8px; border-radius:5px; overflow:hidden; }
+    .proba-bar-fill { height:100%; border-radius:5px; transition: width 0.5s; }
+    .proba-pct { width: 38px; text-align:right; color:#64748b; font-size:12px; }
+
+    /* FORECAST */
+    .forecast-strip { display: flex; gap: 8px; flex-wrap: wrap; }
+    .forecast-cell {
+      flex:1; min-width:62px; max-width:90px;
+      text-align:center; padding:10px 6px;
+      border-radius:10px; border:1px solid #e2e8f0; font-size:12px;
+    }
+    .forecast-cell.current { border-color: var(--navy); background: #f8faff; }
+    .fc-hour { color:#94a3b8; font-size:11px; margin-bottom:5px; }
+    .fc-dot { width:28px;height:28px;border-radius:50%;margin:0 auto 5px;display:flex;align-items:center;justify-content:center;font-size:13px; }
+    .fc-dot.high { background:#fee2e2; }
+    .fc-dot.medium { background:#fef3c7; }
+    .fc-dot.low { background:#dcfce7; }
+    .fc-lbl { font-weight:600; font-size:12px; }
+    .fc-lbl.high { color:var(--red); }
+    .fc-lbl.medium { color:var(--yellow); }
+    .fc-lbl.low { color:var(--green); }
+    .fc-tag { font-size:10px; color:#94a3b8; margin-top:2px; }
+
+    /* ALTERNATE STOPS */
+    .alt-card { display:flex; align-items:center; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; margin-bottom:8px; }
+    .alt-stop-name { font-weight:600; font-size:14px; color:#1e293b; }
+    .alt-stop-dist { font-size:12px; color:#94a3b8; margin-top:1px; }
+    .alt-badge { font-size:12px; font-weight:700; padding:4px 12px; border-radius:20px; }
+    .alt-badge.low    { background:#dcfce7; color:var(--green); }
+    .alt-badge.medium { background:#fef3c7; color:var(--yellow); }
+
+    /* EVENT ALERT */
+    .event-alert { background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:12px 16px; font-size:13px; color:#c2410c; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+
+    /* MAP */
+    #map { height: 420px; border-radius: 12px; }
+
+    /* BEST TIME */
+    .hour-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; }
+    .hour-cell { text-align:center; padding:10px 4px; border-radius:9px; border:1px solid #e2e8f0; font-size:12px; }
+    .hour-cell.high   { background:#fef2f2; border-color:#fca5a5; }
+    .hour-cell.medium { background:#fffbeb; border-color:#fcd34d; }
+    .hour-cell.low    { background:#f0fdf4; border-color:#86efac; }
+    .best-windows { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; }
+    .best-pill { display:flex;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:10px 16px; }
+    .best-pill i { color:var(--green); }
+    .best-pill span { font-size:13px;font-weight:600;color:#15803d; }
+
+    /* FEEDBACK */
+    .fb-btns { display:flex; gap:10px; }
+    .fb-btn { flex:1;padding:12px;border-radius:10px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;font-size:13px;font-weight:600;color:#475569;transition:all 0.18s; }
+    .fb-btn:hover { border-color:var(--navy);color:var(--navy); }
+    .fb-btn.selected { border-color:var(--green);background:#f0fdf4;color:var(--green); }
+
+    /* SPINNER */
+    .spinner { display:inline-block;width:18px;height:18px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      #sidebar { width:60px; }
+      .sidebar-brand h1, .sidebar-brand p, .nav-item span, .nav-section, .sidebar-footer { display:none; }
+      .nav-item { justify-content:center; padding:12px; }
+      #main { margin-left:60px; }
+      .content-area { padding:14px; }
+      .top-bar { padding:12px 16px; }
+      .hour-grid { grid-template-columns:repeat(4,1fr); }
+    }
+  </style>
 </head>
-
 <body>
-    <div class="container">
-        <h2 class="text-center mb-4">🚌 Bus Crowding Predictor</h2>
 
-        {% if error_message %}
-        <div class="alert alert-danger d-flex align-items-center" role="alert">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
-                class="bi bi-exclamation-triangle-fill me-2" viewBox="0 0 16 16">
-                <path
-                    d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" />
-            </svg>
-            <div>{{ error_message }}</div>
+<!-- SIDEBAR -->
+<nav id="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon"><i class="fas fa-bus-alt"></i></div>
+    <h1>Smart Transit</h1>
+    <p>Hyderabad TSRTC</p>
+  </div>
+  <div class="nav-section">Main</div>
+  <a class="nav-item active" onclick="showPanel('predict')"  data-panel="predict">
+    <i class="fas fa-chart-bar"></i><span>Predict Crowd</span>
+  </a>
+  <a class="nav-item" onclick="showPanel('forecast')" data-panel="forecast">
+    <i class="fas fa-clock"></i><span>6-Hour Forecast</span>
+  </a>
+  <a class="nav-item" onclick="showPanel('besttime')" data-panel="besttime">
+    <i class="fas fa-calendar-check"></i><span>Best Time</span>
+  </a>
+  <a class="nav-item" onclick="showPanel('mapview')"  data-panel="mapview">
+    <i class="fas fa-map-marker-alt"></i><span>Stop Map</span>
+  </a>
+  <div class="nav-section">System</div>
+  <a class="nav-item" onclick="showPanel('feedback')" data-panel="feedback">
+    <i class="fas fa-comment-alt"></i><span>Give Feedback</span>
+  </a>
+  <a class="nav-item" onclick="showPanel('about')"    data-panel="about">
+    <i class="fas fa-info-circle"></i><span>About</span>
+  </a>
+  <div class="sidebar-footer">v2.0 · Hyderabad</div>
+</nav>
+
+<!-- MAIN -->
+<div id="main">
+  <div class="top-bar">
+    <div>
+      <h2 id="panel-title">Predict Crowd</h2>
+      <p id="panel-subtitle">Enter trip details to forecast bus crowd level</p>
+    </div>
+    <div class="live-badge"><span></span> Live Model</div>
+  </div>
+
+  <div class="content-area">
+
+    <!-- PREDICT PANEL -->
+    <div id="panel-predict" class="panel active">
+      <div class="row g-4">
+        <div class="col-lg-5">
+          <div class="card-box">
+            <div class="card-title"><i class="fas fa-sliders-h me-2"></i>Trip Details</div>
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label">Route Number</label>
+                <select id="f-route" class="form-select">
+                  {% for r in routes %}<option>{{ r }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label">Bus Stop</label>
+                <select id="f-stop" class="form-select">
+                  {% for s in stops %}<option>{{ s }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="col-6">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+                  <label class="form-label" style="margin:0">Hour (0–23)</label>
+                  <button class="btn-now" onclick="fillNow()"><i class="fas fa-bolt me-1"></i>Now</button>
+                </div>
+                <input type="number" id="f-hour" class="form-control" min="0" max="23" value="{{ current_hour }}">
+              </div>
+              <div class="col-6">
+                <label class="form-label">Day of Week</label>
+                <select id="f-day" class="form-select">
+                  {% for d in days %}<option {% if d == current_day %}selected{% endif %}>{{ d }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="form-label">Weather</label>
+                <select id="f-weather" class="form-select">
+                  {% for w in weathers %}<option>{{ w }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="form-label">Buses on Route: <span id="buses-val">6</span></label>
+                <input type="range" id="f-buses" min="1" max="12" value="6"
+                  oninput="document.getElementById('buses-val').textContent=this.value"
+                  style="width:100%;margin-top:10px;accent-color:var(--navy)">
+              </div>
+              <div class="col-12">
+                <button class="btn-predict" onclick="runPredict()" id="predict-btn">
+                  <i class="fas fa-search me-2"></i>Predict Crowd Level
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-        {% endif %}
-
-        <form action="/" method="post">
-            <!-- Route -->
-            <div class="mb-3">
-                <label for="route" class="form-label fw-semibold">Route Number</label>
-                <select class="form-select" id="route" name="route" required onchange="updateStops(this.value)">
-                    <option value="" disabled {% if not selected_route %}selected{% endif %}>Select Route</option>
-                    {% for route in routes %}
-                    <option value="{{ route }}" {% if route==selected_route %}selected{% endif %}>{{ route }}</option>
-                    {% endfor %}
-                </select>
+        <div class="col-lg-7">
+          <div id="result-area">
+            <div class="card-box text-center" style="padding:48px 24px">
+              <i class="fas fa-bus-alt" style="font-size:40px;color:#cbd5e1;margin-bottom:14px;display:block"></i>
+              <p style="color:#94a3b8;font-size:14px">Fill in your trip details and click<br><strong>Predict Crowd Level</strong> to get started.</p>
             </div>
-
-            <!-- Stop (dynamically filtered) -->
-            <div class="mb-3">
-                <label for="stop" class="form-label fw-semibold">Current Stop</label>
-                <select class="form-select" id="stop" name="stop" required>
-                    <option value="" disabled selected>Select Route first</option>
-                </select>
-                <small id="stop-warning" class="text-warning">
-                    ⚠️ Please select a route first to see valid stops.
-                </small>
-            </div>
-
-            <!-- Hour -->
-            <div class="mb-3">
-                <label for="hour" class="form-label fw-semibold">Hour of Day (0–23)</label>
-                <input type="number" class="form-control" id="hour" name="hour" min="0" max="23"
-                    value="{{ selected_hour }}" required>
-            </div>
-
-            <!-- Day -->
-            <div class="mb-3">
-                <label for="day" class="form-label fw-semibold">Day of Week</label>
-                <select class="form-select" id="day" name="day" required>
-                    {% for day in days %}
-                    <option value="{{ day }}" {% if day==selected_day %}selected{% endif %}>{{ day }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- Weather -->
-            <div class="mb-3">
-                <label for="weather" class="form-label fw-semibold">Weather</label>
-                <select class="form-select" id="weather" name="weather" required>
-                    <option value="" disabled {% if not selected_weather %}selected{% endif %}>Select Weather</option>
-                    {% for weather in weathers %}
-                    <option value="{{ weather }}" {% if weather==selected_weather %}selected{% endif %}>{{ weather }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <input type="hidden" name="buses_available" value="5">
-
-            <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary flex-grow-1">Predict Crowding</button>
-                <a href="/" class="btn btn-secondary">Reset</a>
-            </div>
-        </form>
-
-        {% if prediction %}
-        <div class="prediction-box {{ prediction_class }}">
-            <h4>
-                {% if prediction == 'High' %}🔴{% elif prediction == 'Medium' %}🟡{% else %}🟢{% endif %}
-                Crowding: {{ prediction }}
-            </h4>
-            <p class="mb-0" style="font-size: 0.9em; font-weight: normal;">
-                Route <strong>{{ selected_route }}</strong> at <strong>{{ selected_stop }}</strong>,
-                <strong>{{ selected_hour }}:00</strong> on <strong>{{ selected_day }}</strong>
-                ({{ selected_weather }})
-            </p>
+          </div>
         </div>
-        {% endif %}
+      </div>
     </div>
 
-    <!-- Route → Stops mapping passed from Flask -->
-    <script type="application/json" id="route-stops-data">
-        {{ route_stops | default({}) | tojson | safe }}
-    </script>
-    <script type="application/json" id="selected-stop-data">
-        {{ selected_stop | default('') | tojson | safe }}
-    </script>
+    <!-- FORECAST PANEL -->
+    <div id="panel-forecast" class="panel">
+      <div class="card-box" style="margin-bottom:16px">
+        <div class="card-title"><i class="fas fa-filter me-2"></i>Select Trip for Forecast</div>
+        <div class="row g-3 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label">Route</label>
+            <select id="fc-route" class="form-select">{% for r in routes %}<option>{{ r }}</option>{% endfor %}</select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Stop</label>
+            <select id="fc-stop" class="form-select">{% for s in stops %}<option>{{ s }}</option>{% endfor %}</select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Weather</label>
+            <select id="fc-weather" class="form-select">{% for w in weathers %}<option>{{ w }}</option>{% endfor %}</select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Buses</label>
+            <input type="number" id="fc-buses" class="form-control" value="6" min="1" max="12">
+          </div>
+          <div class="col-md-2">
+            <button class="btn-predict" onclick="runForecast()"><i class="fas fa-chart-line me-1"></i>Forecast</button>
+          </div>
+        </div>
+      </div>
+      <div id="fc-result">
+        <div class="card-box text-center" style="padding:40px">
+          <i class="fas fa-clock" style="font-size:36px;color:#cbd5e1;margin-bottom:12px;display:block"></i>
+          <p style="color:#94a3b8">Select a stop and click Forecast to see the next 7 hours.</p>
+        </div>
+      </div>
+    </div>
 
-    <script>
-        const routeStops = JSON.parse(document.getElementById('route-stops-data').textContent || '{}');
+    <!-- BEST TIME PANEL -->
+    <div id="panel-besttime" class="panel">
+      <div class="card-box" style="margin-bottom:16px">
+        <div class="card-title"><i class="fas fa-search me-2"></i>Find Best Travel Window</div>
+        <div class="row g-3 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label">Route</label>
+            <select id="bt-route" class="form-select">{% for r in routes %}<option>{{ r }}</option>{% endfor %}</select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Stop</label>
+            <select id="bt-stop" class="form-select">{% for s in stops %}<option>{{ s }}</option>{% endfor %}</select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Day</label>
+            <select id="bt-day" class="form-select">{% for d in days %}<option {% if d == current_day %}selected{% endif %}>{{ d }}</option>{% endfor %}</select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Weather</label>
+            <select id="bt-weather" class="form-select">{% for w in weathers %}<option>{{ w }}</option>{% endfor %}</select>
+          </div>
+          <div class="col-md-2">
+            <button class="btn-predict" onclick="runBestTime()"><i class="fas fa-calendar-check me-1"></i>Analyze</button>
+          </div>
+        </div>
+      </div>
+      <div id="bt-result">
+        <div class="card-box text-center" style="padding:40px">
+          <i class="fas fa-calendar-alt" style="font-size:36px;color:#cbd5e1;margin-bottom:12px;display:block"></i>
+          <p style="color:#94a3b8">Select route, stop &amp; day to find the least crowded travel windows.</p>
+        </div>
+      </div>
+    </div>
 
-        function updateStops(selectedRoute) {
-            const stopSelect = document.getElementById('stop');
-            const warning = document.getElementById('stop-warning');
+    <!-- MAP PANEL -->
+    <div id="panel-mapview" class="panel">
+      <div class="card-box">
+        <div class="card-title"><i class="fas fa-map me-2"></i>All Bus Stops · Hyderabad</div>
+        <div id="map"></div>
+      </div>
+    </div>
 
-            stopSelect.innerHTML = '';
+    <!-- FEEDBACK PANEL -->
+    <div id="panel-feedback" class="panel">
+      <div class="card-box" style="max-width:540px">
+        <div class="card-title"><i class="fas fa-comment me-2"></i>Was the Prediction Accurate?</div>
+        <p style="font-size:13px;color:#64748b;margin-bottom:20px">Your feedback helps improve the model for all Hyderabad commuters.</p>
+        <div id="fb-last-pred" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:18px;font-size:13px;color:#475569">
+          No prediction made yet. Go to <strong>Predict Crowd</strong> first.
+        </div>
+        <label class="form-label" style="margin-bottom:10px">What was the actual crowd level?</label>
+        <div class="fb-btns" style="margin-bottom:20px">
+          <button class="fb-btn" onclick="selectFb(this,'Low')">🟢 Low</button>
+          <button class="fb-btn" onclick="selectFb(this,'Medium')">🟡 Medium</button>
+          <button class="fb-btn" onclick="selectFb(this,'High')">🔴 High</button>
+        </div>
+        <button class="btn-predict" onclick="submitFeedback()"><i class="fas fa-paper-plane me-2"></i>Submit Feedback</button>
+        <div id="fb-thanks" style="display:none;margin-top:14px;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px;font-size:13px;color:#15803d;text-align:center">
+          ✅ Thanks! Your feedback has been recorded.
+        </div>
+      </div>
+    </div>
 
-            if (!routeStops || !selectedRoute || !routeStops[selectedRoute]) {
-                stopSelect.innerHTML = '<option value="" disabled selected>Select Route first</option>';
-                warning.style.display = 'block';
-                return;
-            }
+    <!-- ABOUT PANEL -->
+    <div id="panel-about" class="panel">
+      <div class="card-box" style="max-width:600px">
+        <div class="card-title"><i class="fas fa-info-circle me-2"></i>About This Project</div>
+        <div style="font-size:14px;color:#475569;line-height:1.8">
+          <p><strong>Smart Transit Hyderabad</strong> is an ML-powered crowd forecasting system for TSRTC bus routes.</p>
+          <br>
+          <p><strong>Model:</strong> Random Forest Classifier (300 estimators, max depth 18)</p>
+          <p><strong>Dataset:</strong> 10,000 synthetic records with realistic Hyderabad peak patterns</p>
+          <p><strong>Training features:</strong> Hour, Day, Weekend flag, Route, Stop, Weather, Buses Available, Month, Festival flag</p>
+          <br>
+          <p><strong>Unique features:</strong></p>
+          <ul style="margin-left:18px;margin-top:6px">
+            <li>Hyderabad event calendar (Bonalu, Dussehra, Ganesh Chaturthi, IPL, etc.)</li>
+            <li>Alternate stop suggestions when crowd is predicted High</li>
+            <li>6-hour ahead forecast on same route &amp; stop</li>
+            <li>Model confidence via predict_proba() with class breakdown</li>
+            <li>Best travel time finder across all 24 hours</li>
+            <li>Auto-fill current time with "Now" button</li>
+            <li>Buses Available as live input (fixed hardcode from v1)</li>
+          </ul>
+          <br>
+          <p style="font-size:12px;color:#94a3b8">Built with Flask · scikit-learn · Leaflet.js · Bootstrap 5</p>
+        </div>
+      </div>
+    </div>
 
-            warning.style.display = 'none';
+  </div><!-- /content-area -->
+</div><!-- /main -->
 
-            const stops = routeStops[selectedRoute];
-            const placeholder = document.createElement('option');
-            placeholder.value = '';
-            placeholder.disabled = true;
-            placeholder.selected = true;
-            placeholder.textContent = `Select stop on Route ${selectedRoute}`;
-            stopSelect.appendChild(placeholder);
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const STOP_COORDS = {{ stop_coords|tojson }};
+const CURRENT_MONTH = {{ current_month }};
+let map = null;
+let selectedFeedback = null;
 
-            stops.forEach(stop => {
-                const opt = document.createElement('option');
-                opt.value = stop;
-                opt.textContent = stop;
-                stopSelect.appendChild(opt);
-            });
-        }
+const PANEL_META = {
+  predict:  { title:'Predict Crowd',       sub:'Enter trip details to forecast bus crowd level' },
+  forecast: { title:'6-Hour Forecast',     sub:'See how crowd changes over the next 6 hours' },
+  besttime: { title:'Best Time to Travel', sub:'Find the least crowded window for your route' },
+  mapview:  { title:'Stop Map',            sub:'View all TSRTC stops on the map' },
+  feedback: { title:'Give Feedback',       sub:'Help improve predictions by reporting actual crowd' },
+  about:    { title:'About',               sub:'Project details, model info, and features' },
+};
 
-        // On page load, if a route was already selected (after form submit), repopulate stops
-        window.addEventListener('DOMContentLoaded', () => {
-            const routeSelect = document.getElementById('route');
-            const selectedStop = JSON.parse(document.getElementById('selected-stop-data').textContent || '""');
-            const selectedRoute = routeSelect.value;
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  document.querySelector(`[data-panel="${name}"]`).classList.add('active');
+  document.getElementById('panel-title').textContent    = PANEL_META[name].title;
+  document.getElementById('panel-subtitle').textContent = PANEL_META[name].sub;
+  if (name === 'mapview') initMap();
+}
 
-            if (selectedRoute) {
-                updateStops(selectedRoute);
-                // Re-select the previously chosen stop
-                if (selectedStop) {
-                    const stopSelect = document.getElementById('stop');
-                    for (let opt of stopSelect.options) {
-                        if (opt.value === selectedStop) {
-                            opt.selected = true;
-                            break;
-                        }
-                    }
-                }
-            }
-        });
-    </script>
+function fillNow() {
+  const now  = new Date();
+  document.getElementById('f-hour').value = now.getHours();
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const today = days[now.getDay()];
+  const sel   = document.getElementById('f-day');
+  for (let o of sel.options) if (o.value === today) { o.selected = true; break; }
+}
+
+function crowdIcon(l)  { return l==='High'?'🔴':l==='Medium'?'🟡':'🟢'; }
+function crowdClass(l) { return l.toLowerCase(); }
+
+function renderResult(data) {
+  const { prediction, confidence, proba, forecast, alternates, event_alert } = data;
+  const cls  = crowdClass(prediction);
+  const icon = prediction==='High'?'🚨':prediction==='Medium'?'⚡':'✅';
+  const msg  = prediction==='High'
+    ? 'Heavy congestion expected. Consider alternate stops or waiting.'
+    : prediction==='Medium'
+    ? 'Moderate crowd. Limited seating — you can still board comfortably.'
+    : 'Smooth travel. Good seat availability expected.';
+
+  let html = '';
+
+  if (event_alert) {
+    html += `<div class="event-alert"><i class="fas fa-exclamation-triangle"></i>${event_alert}</div>`;
+  }
+
+  html += `<div class="result-banner ${cls}">
+    <div class="result-icon">${icon}</div>
+    <div class="result-text"><h3>${prediction} Crowd</h3><p>${msg}</p></div>
+  </div>`;
+
+  html += `<div class="card-box" style="margin-bottom:16px">
+    <div class="card-title">Model Confidence</div>
+    <div class="conf-label">
+      <span>Confidence: <strong>${confidence}%</strong></span>
+      <span style="font-size:11px;color:#94a3b8">${confidence>=75?'High certainty':confidence>=55?'Moderate certainty':'Low — check again closer to departure'}</span>
+    </div>
+    <div class="conf-bar"><div class="conf-fill ${cls}" style="width:${confidence}%"></div></div>
+    <div style="margin-top:14px">`;
+
+  for (const [lbl, pct] of Object.entries(proba)) {
+    const bc = lbl==='High'?'var(--red)':lbl==='Medium'?'var(--yellow)':'var(--green)';
+    html += `<div class="proba-row">
+      <div class="proba-label">${lbl}</div>
+      <div class="proba-bar-bg"><div class="proba-bar-fill" style="width:${pct}%;background:${bc}"></div></div>
+      <div class="proba-pct">${pct}%</div>
+    </div>`;
+  }
+  html += `</div></div>`;
+
+  html += `<div class="card-box" style="margin-bottom:16px">
+    <div class="card-title"><i class="fas fa-clock me-2"></i>Next 7 Hours</div>
+    <div class="forecast-strip">`;
+  forecast.forEach((fc, i) => {
+    const fcCls = crowdClass(fc.level);
+    html += `<div class="forecast-cell ${i===0?'current':''}">
+      <div class="fc-hour">${String(fc.hour).padStart(2,'0')}:00</div>
+      <div class="fc-dot ${fcCls}">${crowdIcon(fc.level)}</div>
+      <div class="fc-lbl ${fcCls}">${fc.level}</div>
+      <div class="fc-tag">${fc.label}</div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  if (alternates && alternates.length > 0) {
+    html += `<div class="card-box">
+      <div class="card-title"><i class="fas fa-route me-2"></i>Alternate Stops on Same Route</div>
+      <p style="font-size:13px;color:#64748b;margin-bottom:12px">These stops have lower predicted crowd right now:</p>`;
+    alternates.forEach(a => {
+      html += `<div class="alt-card">
+        <div>
+          <div class="alt-stop-name"><i class="fas fa-map-pin me-2" style="color:#94a3b8;font-size:12px"></i>${a.stop}</div>
+          ${a.dist?`<div class="alt-stop-dist">${a.dist}</div>`:''}
+        </div>
+        <span class="alt-badge ${crowdClass(a.level)}">${crowdIcon(a.level)} ${a.level}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  document.getElementById('fb-last-pred').innerHTML =
+    `Last prediction: <strong>${prediction} crowd</strong> at <strong>${document.getElementById('f-stop').value}</strong> — ${document.getElementById('f-hour').value}:00, ${document.getElementById('f-day').value}`;
+  document.getElementById('result-area').innerHTML = html;
+}
+
+async function runPredict() {
+  const btn = document.getElementById('predict-btn');
+  btn.innerHTML = '<span class="spinner"></span> Predicting...';
+  btn.disabled = true;
+  const payload = {
+    route:   document.getElementById('f-route').value,
+    stop:    document.getElementById('f-stop').value,
+    hour:    document.getElementById('f-hour').value,
+    day:     document.getElementById('f-day').value,
+    weather: document.getElementById('f-weather').value,
+    buses:   document.getElementById('f-buses').value,
+    month:   CURRENT_MONTH
+  };
+  try {
+    const res  = await fetch('/predict', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+    const data = await res.json();
+    renderResult(data);
+  } catch(e) {
+    document.getElementById('result-area').innerHTML = '<div class="card-box" style="color:var(--red)">Error: Is Flask running on port 5000?</div>';
+  }
+  btn.innerHTML = '<i class="fas fa-search me-2"></i>Predict Crowd Level';
+  btn.disabled = false;
+}
+
+async function runForecast() {
+  const now  = new Date();
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const payload = {
+    route:   document.getElementById('fc-route').value,
+    stop:    document.getElementById('fc-stop').value,
+    hour:    now.getHours(),
+    day:     days[now.getDay()],
+    weather: document.getElementById('fc-weather').value,
+    buses:   document.getElementById('fc-buses').value,
+    month:   CURRENT_MONTH
+  };
+  document.getElementById('fc-result').innerHTML = '<div class="card-box text-center" style="padding:30px"><span class="spinner" style="width:28px;height:28px;border-color:rgba(0,0,0,.15);border-top-color:var(--navy)"></span></div>';
+  const res  = await fetch('/predict', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+  const data = await res.json();
+  const { forecast } = data;
+
+  let html = `<div class="card-box">
+    <div class="card-title">7-Hour Forecast · ${payload.stop} · Route ${payload.route}</div>
+    <div class="forecast-strip">`;
+  forecast.forEach((fc,i) => {
+    const fcCls = crowdClass(fc.level);
+    html += `<div class="forecast-cell ${i===0?'current':''}" style="min-width:78px">
+      <div class="fc-hour">${String(fc.hour).padStart(2,'0')}:00</div>
+      <div class="fc-dot ${fcCls}" style="width:32px;height:32px;font-size:15px">${crowdIcon(fc.level)}</div>
+      <div class="fc-lbl ${fcCls}">${fc.level}</div>
+      <div class="fc-tag">${fc.label}</div>
+    </div>`;
+  });
+  html += `</div></div>`;
+  const lowHours = forecast.filter(f=>f.level==='Low').map(f=>`${String(f.hour).padStart(2,'0')}:00`);
+  if (lowHours.length>0) {
+    html += `<div class="card-box" style="margin-top:14px;background:#f0fdf4;border-color:#86efac">
+      <p style="font-size:13px;color:#15803d;margin:0"><i class="fas fa-check-circle me-2"></i>
+      <strong>Best windows:</strong> ${lowHours.join(', ')} — Low crowd expected.</p></div>`;
+  }
+  document.getElementById('fc-result').innerHTML = html;
+}
+
+async function runBestTime() {
+  document.getElementById('bt-result').innerHTML = '<div class="card-box text-center" style="padding:30px"><span class="spinner" style="width:28px;height:28px;border-color:rgba(0,0,0,.15);border-top-color:var(--navy)"></span><p style="color:#94a3b8;margin-top:12px">Analyzing all 24 hours...</p></div>';
+  const stop    = document.getElementById('bt-stop').value;
+  const route   = document.getElementById('bt-route').value;
+  const day     = document.getElementById('bt-day').value;
+  const weather = document.getElementById('bt-weather').value;
+  const results = [];
+  for (let h=0; h<24; h++) {
+    const payload = {route,stop,hour:h,day,weather,buses:6,month:CURRENT_MONTH};
+    const res  = await fetch('/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const data = await res.json();
+    results.push({hour:h,level:data.prediction,confidence:data.confidence});
+  }
+  const lowWindows = results.filter(r=>r.level==='Low');
+  let html = '';
+  if (lowWindows.length>0) {
+    html += `<div class="card-box" style="margin-bottom:16px">
+      <div class="card-title"><i class="fas fa-star me-2" style="color:var(--green)"></i>Best Travel Windows</div>
+      <div class="best-windows">`;
+    lowWindows.slice(0,5).forEach(w => {
+      html += `<div class="best-pill"><i class="fas fa-check-circle"></i><span>${String(w.hour).padStart(2,'0')}:00 – ${String((w.hour+1)%24).padStart(2,'0')}:00</span></div>`;
+    });
+    html += `</div></div>`;
+  }
+  html += `<div class="card-box"><div class="card-title">All-Day Crowd Heatmap · ${stop}</div>
+    <div class="hour-grid">`;
+  results.forEach(r => {
+    const cls = crowdClass(r.level);
+    const clr = r.level==='High'?'var(--red)':r.level==='Medium'?'var(--yellow)':'var(--green)';
+    html += `<div class="hour-cell ${cls}">
+      <div style="font-weight:700;font-size:13px;color:#1e293b">${String(r.hour).padStart(2,'0')}:00</div>
+      <div style="font-size:16px;margin:4px 0">${crowdIcon(r.level)}</div>
+      <div style="font-size:11px;font-weight:600;color:${clr}">${r.level}</div>
+    </div>`;
+  });
+  html += `</div></div>`;
+  document.getElementById('bt-result').innerHTML = html;
+}
+
+function initMap() {
+  if (map) return;
+  setTimeout(() => {
+    map = L.map('map').setView([17.415, 78.44], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap' }).addTo(map);
+    Object.entries(STOP_COORDS).forEach(([name, coords]) => {
+      L.marker(coords).addTo(map).bindPopup(`<strong>${name}</strong><br><small>TSRTC Bus Stop</small>`);
+    });
+  }, 100);
+}
+
+function selectFb(btn, val) {
+  selectedFeedback = val;
+  document.querySelectorAll('.fb-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+function submitFeedback() {
+  if (!selectedFeedback) { alert('Please select the actual crowd level.'); return; }
+  document.getElementById('fb-thanks').style.display = 'block';
+  document.querySelectorAll('.fb-btn').forEach(b => b.classList.remove('selected'));
+  selectedFeedback = null;
+  setTimeout(() => { document.getElementById('fb-thanks').style.display = 'none'; }, 3000);
+}
+</script>
 </body>
-
 </html>
