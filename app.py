@@ -1,15 +1,34 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+from werkzeug.security import generate_password_hash, check_password_hash
+import sqlite3
 import pandas as pd
 import pickle
 import numpy as np
 from datetime import datetime
 
 app = Flask(__name__)
+#advitha-added this for login. without this session it wont work properly
+app.secret_key = "advitha_secret_key"
 
 with open('models/hyderabad_bus_model.pkl', 'rb') as f:
     model = pickle.load(f)
 with open('models/hyderabad_encoders.pkl', 'rb') as f:
     encoders = pickle.load(f)
+#advitha-added this for backend database making part. (this part will create tables and db)
+def init_db():
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
 
 STOP_COORDS = {
     'Hitech City': [17.4483, 78.3915],
@@ -107,6 +126,9 @@ days   = encoders['Day_of_Week'].classes_
 
 @app.route('/')
 def home():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+
     now = datetime.now()
     return render_template('index.html',
         routes=list(routes), stops=list(stops),
@@ -116,6 +138,50 @@ def home():
         current_day=now.strftime('%A'),
         current_month=now.month
     )
+#advitha- added this. for login and signup. 
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = generate_password_hash(request.form['password'])
+
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+
+        try:
+            c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
+            conn.commit()
+            conn.close()
+            return redirect(url_for('login'))
+        except:
+            return "Username already exists ❌"
+
+    return render_template('signup.html')
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute("SELECT * FROM users WHERE username=?", (username,))
+        user = c.fetchone()
+        conn.close()
+
+        if user and check_password_hash(user[2], password):
+            session['user'] = username
+            return redirect(url_for('home'))
+        else:
+            return "Invalid credentials ❌"
+
+    return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    return redirect(url_for('login'))
 
 @app.route('/predict', methods=['POST'])
 def predict():
