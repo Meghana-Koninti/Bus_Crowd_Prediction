@@ -15,10 +15,10 @@
       --green:  #16a34a;
       --yellow: #d97706;
       --red:    #dc2626;
-      --sidebar-w: 220px;
+      --sidebar-w: 240px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #f1f5f9; font-family: 'Segoe UI', sans-serif; display: flex; min-height: 100vh; }
+    body { background: #f1f5f9; font-family: 'Segoe UI', sans-serif; display: flex; min-height: 100vh; font-size: 15px;}
  
     /* SIDEBAR */
     #sidebar {
@@ -43,15 +43,33 @@
       display: flex; align-items: center; gap: 10px;
       padding: 10px 14px; margin: 2px 8px; border-radius: 8px;
       cursor: pointer; color: rgba(255,255,255,0.6);
-      font-size: 13.5px; font-weight: 500; transition: all 0.18s;
+      font-size: 14.5px; font-weight: 500; transition: all 0.18s;
       text-decoration: none;
     }
     .nav-item i { width: 18px; text-align: center; font-size: 14px; }
     .nav-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
     .nav-item.active { background: rgba(249,115,22,0.18); color: #fb923c; }
     .nav-item.active i { color: var(--accent); }
-    .sidebar-footer { margin-top: auto; padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.07); font-size: 11px; color: rgba(255,255,255,0.25); }
- 
+.sidebar-footer { padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.07); font-size: 11px; color: rgba(255,255,255,0.25); }
+
+/* PROFILE BUTTON at bottom of sidebar */
+.sidebar-spacer { flex: 1; }
+.profile-btn {
+  margin: 8px; border-radius: 10px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  padding: 10px 12px; cursor: pointer; display: flex; align-items: center; gap: 10px;
+  transition: background 0.18s; text-decoration: none;
+}
+.profile-btn:hover { background: rgba(255,255,255,0.11); }
+.profile-btn.active { background: rgba(249,115,22,0.18); border-color: rgba(249,115,22,0.3); }
+.profile-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--accent); display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.profile-info { flex: 1; min-width: 0; }
+.profile-info .p-name { font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.profile-info .p-role { font-size: 10px; color: rgba(255,255,255,0.4); } 
     /* MAIN */
     #main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
     .top-bar {
@@ -71,18 +89,18 @@
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
     .content-area { padding: 24px 28px; flex: 1; }
     .panel { display: none; }
-    .panel.active { display: block; }
+    .panel.active { display: block; min-height: calc(100vh - 120px);}
  
     /* CARDS */
     .card-box { background: #fff; border-radius: 14px; border: 1px solid #e2e8f0; padding: 22px; }
     .card-box + .card-box { margin-top: 16px; }
-    .card-title { font-size: 13px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px; }
+    .card-title { font-size: 14px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px; }
  
     /* FORM */
-    .form-label { font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 5px; display: block; }
+    .form-label { font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 5px; display: block; }
     .form-control, .form-select {
       border: 1px solid #e2e8f0; border-radius: 8px;
-      font-size: 14px; padding: 9px 12px; color: #1e293b;
+      font-size: 15px; padding: 9px 12px; color: #1e293b;
       transition: border-color 0.18s, box-shadow 0.18s; width: 100%;
     }
     .form-control:focus, .form-select:focus {
@@ -233,7 +251,16 @@
   <a class="nav-item" onclick="showPanel('about')"    data-panel="about">
     <i class="fas fa-info-circle"></i><span>About</span>
   </a>
-  <div class="sidebar-footer">v2.0 · Hyderabad</div>
+  <div class="sidebar-spacer"></div>
+  <a class="profile-btn nav-item" onclick="showPanel('profile')" data-panel="profile">
+    <div class="profile-avatar" id="sidebar-avatar">?</div>
+    <div class="profile-info">
+      <div class="p-name" id="sidebar-username">{{ user }}</div>
+      <div class="p-role">Commuter</div>
+    </div>
+    <i class="fas fa-chevron-right" style="font-size:11px;color:rgba(255,255,255,0.3)"></i>
+  </a>
+  <div class="sidebar-footer">Bus Crowd Prediction - Hyderabad</div>
 </nav>
  
 <!-- MAIN -->
@@ -251,7 +278,7 @@
     <!-- PREDICT PANEL -->
     <div id="panel-predict" class="panel active">
       <div class="row g-4">
-        <div class="col-lg-5">
+        <div class="col-lg-6">
           <div class="card-box">
  
             <!-- CHANGE 2: Now button moved to top-right of card header -->
@@ -300,7 +327,7 @@
           </div>
         </div>
  
-        <div class="col-lg-7">
+        <div class="col-lg-6">
           <div id="result-area">
             <div class="card-box text-center" style="padding:48px 24px">
               <i class="fas fa-bus-alt" style="font-size:40px;color:#cbd5e1;margin-bottom:14px;display:block"></i>
@@ -403,7 +430,7 @@
  
     <!-- FEEDBACK PANEL -->
     <div id="panel-feedback" class="panel">
-      <div class="card-box" style="max-width:540px">
+      <div class="card-box" style="max-width:100%">
         <div class="card-title"><i class="fas fa-comment me-2"></i>Was the Prediction Accurate?</div>
         <p style="font-size:13px;color:#64748b;margin-bottom:20px">Your feedback helps improve the model for all Hyderabad commuters.</p>
         <div id="fb-last-pred" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:18px;font-size:13px;color:#475569">
@@ -426,9 +453,9 @@
  
     <!-- ABOUT PANEL -->
     <div id="panel-about" class="panel">
-      <div class="card-box" style="max-width:600px">
+      <div class="card-box">
         <div class="card-title"><i class="fas fa-info-circle me-2"></i>About This Project</div>
-        <div style="font-size:14px;color:#475569;line-height:1.8">
+        <div style="font-size:14px; color:#475569; line-height:1.8; max-width: 720px;">
           <p><strong>Smart Transit Hyderabad</strong> is an ML-powered crowd forecasting system for TSRTC bus routes.</p>
           <br>
           <p><strong>Model:</strong> XGBoost Classifier</p>
@@ -451,9 +478,73 @@
         </div>
       </div>
     </div>
+
+    <!-- PROFILE PANEL -->
+    <div id="panel-profile" class="panel">
+      <div class="row g-4 justify-content-center">
+        <div class="col-xl-5 col-lg-6 col-md-10">
+          <div class="card-box">
+            <div class="card-title"><i class="fas fa-user-circle me-2"></i>Account Information</div>
+            <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
+              <div style="width:64px;height:64px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#fff;flex-shrink:0" id="profile-big-avatar">?</div>
+              <div>
+                <div style="font-size:18px;font-weight:700;color:#1e293b" id="profile-display-name">—</div>
+                <div style="font-size:13px;color:#94a3b8">TSRTC Smart Transit User</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:14px">
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
+                <div style="width:36px;height:36px;background:#eff6ff;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <i class="fas fa-user" style="color:#3b82f6;font-size:14px"></i>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Username</div>
+                  <div style="font-size:14px;font-weight:600;color:#1e293b" id="profile-username">—</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
+                <div style="width:36px;height:36px;background:#f0fdf4;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <i class="fas fa-envelope" style="color:#16a34a;font-size:14px"></i>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Email</div>
+                  <div style="font-size:14px;font-weight:600;color:#1e293b" id="profile-email">—</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
+                <div style="width:36px;height:36px;background:#fff7ed;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <i class="fas fa-route" style="color:var(--accent);font-size:14px"></i>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Total Predictions</div>
+                  <div style="font-size:14px;font-weight:600;color:#1e293b" id="profile-pred-count">0</div>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:20px;padding-top:16px;border-top:1px solid #f1f5f9">
+              <a href="/logout" style="display:flex;align-items:center;gap:8px;color:#ef4444;font-size:13px;font-weight:600;text-decoration:none;padding:10px 14px;border-radius:8px;border:1px solid #fecaca;background:#fef2f2;transition:all 0.18s">
+                <i class="fas fa-sign-out-alt"></i> Sign Out
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-xl-5 col-lg-6 col-md-10">
+          <div class="card-box" style="height:100%">
+            <div class="card-title"><i class="fas fa-history me-2"></i>Last 5 Predictions</div>
+            <div id="profile-history">
+              <div style="text-align:center;padding:40px 24px">
+                <i class="fas fa-bus-alt" style="font-size:36px;color:#cbd5e1;margin-bottom:12px;display:block"></i>
+                <p style="color:#94a3b8;font-size:14px">No predictions yet.<br>Use <strong>Predict Crowd</strong> to get started.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
  
   </div><!-- /content-area -->
-</div><!-- /main -->
+    </div><!-- /main -->
  
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -461,6 +552,8 @@ const STOP_COORDS = {{ stop_coords|tojson }};
 const CURRENT_MONTH = {{ current_month }};
 let map = null;
 let selectedFeedback = null;
+let predictionHistory = JSON.parse(localStorage.getItem('predHistory') || '[]');
+let profileData = null;
  
 // ── CHANGE 9: PANEL_META updated — forecast renamed to Route Overview ──
 const PANEL_META = {
@@ -470,6 +563,7 @@ const PANEL_META = {
   mapview:  { title:'Stop Map',            sub:'View all TSRTC stops on the map' },
   feedback: { title:'Give Feedback',       sub:'Help improve predictions by reporting actual crowd' },
   about:    { title:'About',               sub:'Project details, model info, and features' },
+  profile:  { title:'My Profile',          sub:'Your account info and recent predictions' },
 };
  
 // ── CHANGE 10: ROUTE_STOPS object for dropdown filtering ──
@@ -590,7 +684,20 @@ function renderResult(data) {
     });
     html += `</div>`;
   }
- 
+  
+  // Save to local history
+  const histEntry = {
+    route: document.getElementById('f-route').value,
+    stop: document.getElementById('f-stop').value,
+    hour: document.getElementById('f-hour').value,
+    day: document.getElementById('f-day').value,
+    prediction,
+    time: new Date().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'})
+  };
+  predictionHistory.unshift(histEntry);
+  predictionHistory = predictionHistory.slice(0, 5);
+  localStorage.setItem('predHistory', JSON.stringify(predictionHistory));
+
   document.getElementById('fb-last-pred').innerHTML =
     `Last prediction: <strong>${prediction} crowd</strong> at <strong>${document.getElementById('f-stop').value}</strong> — ${document.getElementById('f-hour').value}:00, ${document.getElementById('f-day').value}`;
   document.getElementById('result-area').innerHTML = html;
@@ -763,12 +870,64 @@ function submitFeedback() {
   setTimeout(() => { document.getElementById('fb-thanks').style.display = 'none'; }, 3000);
 }
  
-// ── CHANGE 13: Initialize all stop dropdowns on page load ──
-// This runs once when page loads so dropdowns aren't empty.
+function renderProfileHistory() {
+  const container = document.getElementById('profile-history');
+  if (!predictionHistory.length) return;
+  const crowdColors = { High: '#fee2e2', Medium: '#fffbeb', Low: '#f0fdf4' };
+  const crowdText   = { High: 'var(--red)', Medium: 'var(--yellow)', Low: 'var(--green)' };
+  let html = '<div style="display:flex;flex-direction:column;gap:10px">';
+  predictionHistory.forEach((p, i) => {
+    html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:${crowdColors[p.prediction]};border-radius:10px;border:1px solid #e2e8f0">
+      <div>
+        <div style="font-weight:600;font-size:14px;color:#1e293b">
+          <span style="color:#94a3b8;font-size:11px;margin-right:6px">#${i+1}</span>
+          Route ${p.route} · ${p.stop}
+        </div>
+        <div style="font-size:12px;color:#64748b;margin-top:3px">${p.day} · ${String(p.hour).padStart(2,'0')}:00 · ${p.time}</div>
+      </div>
+      <span style="font-size:13px;font-weight:700;color:${crowdText[p.prediction]};padding:4px 12px;border-radius:20px;background:#fff;border:1px solid currentColor">${crowdIcon(p.prediction)} ${p.prediction}</span>
+    </div>`;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+async function loadProfileData() {
+  if (profileData) return;
+  try {
+    const res = await fetch('/profile-data');
+    profileData = await res.json();
+    const initials = profileData.username ? profileData.username[0].toUpperCase() : '?';
+    document.getElementById('sidebar-avatar').textContent = initials;
+    document.getElementById('sidebar-username').textContent = profileData.username;
+    document.getElementById('profile-big-avatar').textContent = initials;
+    document.getElementById('profile-display-name').textContent = profileData.username;
+    document.getElementById('profile-username').textContent    = profileData.username;
+    document.getElementById('profile-email').textContent       = profileData.email;
+  } catch(e) { console.error('Profile load failed', e); }
+}
+
+// PATCHED showPanel — handles profile panel extras without override tricks
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  document.querySelector(`[data-panel="${name}"]`).classList.add('active');
+  document.getElementById('panel-title').textContent    = PANEL_META[name].title;
+  document.getElementById('panel-subtitle').textContent = PANEL_META[name].sub;
+  if (name === 'mapview') initMap();
+  if (name === 'profile') {
+    loadProfileData();
+    document.getElementById('profile-pred-count').textContent = predictionHistory.length;
+    renderProfileHistory();
+  }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   filterStops('f-route',  'f-stop');
   filterStops('bt-route', 'bt-stop');
   updateFcStopInfo();
+  loadProfileData();
 });
 </script>
 </body>
